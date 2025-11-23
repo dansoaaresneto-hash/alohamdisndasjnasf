@@ -1,0 +1,7 @@
+{
+  "name": "Timeline Task Manager",
+  "description": "A beautiful, timeline-based task management app with AI-powered task breakdown capabilities.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
