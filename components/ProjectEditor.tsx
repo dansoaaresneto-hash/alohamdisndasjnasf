@@ -61,7 +61,7 @@ const EditorBlock = React.memo(({
   onUpdate, 
   onAdd, 
   onRemove, 
-  onSlash,
+  onSlash, 
   onPlus,
   onTaskStatus,
   onTaskEdit,
@@ -303,7 +303,6 @@ const ProjectEditor: React.FC<ProjectEditorProps> = ({
     document.execCommand(command, false, value);
   };
 
-  // Toggle highlight: If selection has same color, remove it. Else apply new color.
   const handleToggleHighlight = (colorHex: string) => {
     document.execCommand('styleWithCSS', false, 'true');
     const currentColor = document.queryCommandValue('hiliteColor');
