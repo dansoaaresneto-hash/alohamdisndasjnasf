@@ -18,7 +18,9 @@ import {
   Bell,
   FileText,
   Moon,
-  Sun
+  Sun,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { format, isToday, isYesterday, isTomorrow } from 'date-fns';
 
@@ -124,6 +126,8 @@ const App: React.FC = () => {
   
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [focusedTask, setFocusedTask] = useState<Task | null>(null);
+
+  const [showCompleted, setShowCompleted] = useState(false);
 
   // Dark mode state
   const [darkMode, setDarkMode] = useState(false);
@@ -235,9 +239,10 @@ const App: React.FC = () => {
       setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
   };
 
-  // Group tasks by date string
-  const groupedTasks = useMemo<{ [key: string]: Task[] }>(() => {
-    const groups: { [key: string]: Task[] } = {};
+  // Separate tasks into Active and Completed
+  const { activeGroups, completedTasks } = useMemo(() => {
+    const active: { [key: string]: Task[] } = {};
+    const completed: Task[] = [];
     
     const sortedTasks = [...tasks].sort((a, b) => {
         const dateComp = b.date.getTime() - a.date.getTime(); 
@@ -246,17 +251,21 @@ const App: React.FC = () => {
     });
 
     sortedTasks.forEach(task => {
-      let dateKey = format(task.date, 'yyyy-MM-dd');
-      if (isToday(task.date)) dateKey = 'Today';
-      else if (isYesterday(task.date)) dateKey = 'Yesterday';
-      else if (isTomorrow(task.date)) dateKey = 'Tomorrow';
-      else dateKey = format(task.date, 'MMMM d');
+      if (task.status === TaskStatus.Completed) {
+        completed.push(task);
+      } else {
+        let dateKey = format(task.date, 'yyyy-MM-dd');
+        if (isToday(task.date)) dateKey = 'Today';
+        else if (isYesterday(task.date)) dateKey = 'Yesterday';
+        else if (isTomorrow(task.date)) dateKey = 'Tomorrow';
+        else dateKey = format(task.date, 'MMMM d');
 
-      if (!groups[dateKey]) groups[dateKey] = [];
-      groups[dateKey].push(task);
+        if (!active[dateKey]) active[dateKey] = [];
+        active[dateKey].push(task);
+      }
     });
 
-    return groups;
+    return { activeGroups: active, completedTasks: completed };
   }, [tasks]);
 
   const todayTasksCount = tasks.filter(t => isToday(t.date) && t.status === TaskStatus.Pending).length;
@@ -464,73 +473,109 @@ const App: React.FC = () => {
 
                     {/* Tasks Timeline */}
                     <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 md:p-10 transition-colors duration-300">
-                    {/* Today Section */}
-                        <div className="mb-8">
-                        <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center gap-2">
-                            Today
-                            <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 font-medium">
-                            {(groupedTasks['Today'] as Task[])?.length || 0}
-                            </span>
-                        </h2>
+                    
+                        {/* Active Tasks Grouped by Date */}
+                        {Object.entries(activeGroups).length > 0 ? (
+                            <>
+                                {/* Today Section */}
+                                {activeGroups['Today'] && (
+                                    <div className="mb-8">
+                                        <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-6 flex items-center gap-2">
+                                            Today
+                                            <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-xs text-gray-500 dark:text-gray-400 font-medium">
+                                            {activeGroups['Today'].length}
+                                            </span>
+                                        </h2>
+                                        <div>
+                                            {activeGroups['Today'].map((task, idx, arr) => (
+                                                <TimelineItem 
+                                                    key={task.id} 
+                                                    task={task} 
+                                                    isLast={idx === arr.length - 1} 
+                                                    onToggle={handleToggleTask}
+                                                    onEdit={handleEditTask}
+                                                    onSubtaskToggle={handleSubtaskToggle}
+                                                    onStatusChange={handleStatusChange}
+                                                    onFocus={handleFocusTask}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
-                        <div className="relative">
-                            {(groupedTasks['Today'] || []).map((task, idx, arr) => (
-                            <TimelineItem 
-                                key={task.id} 
-                                task={task} 
-                                isLast={idx === arr.length - 1} 
-                                onToggle={handleToggleTask}
-                                onEdit={handleEditTask}
-                                onSubtaskToggle={handleSubtaskToggle}
-                                onStatusChange={handleStatusChange}
-                                onFocus={handleFocusTask}
-                            />
-                            ))}
+                                {/* Previous/Future Days */}
+                                {Object.entries(activeGroups).map(([key, groupTasks]) => {
+                                    if (key === 'Today') return null;
+                                    return (
+                                        <div key={key} className="mb-8 pt-8 border-t border-gray-50 dark:border-gray-800">
+                                            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-6">{key}</h2>
+                                            <div>
+                                                {groupTasks.map((task, idx, arr) => (
+                                                    <TimelineItem 
+                                                        key={task.id} 
+                                                        task={task} 
+                                                        isLast={idx === arr.length - 1} 
+                                                        onToggle={handleToggleTask}
+                                                        onEdit={handleEditTask}
+                                                        onSubtaskToggle={handleSubtaskToggle}
+                                                        onStatusChange={handleStatusChange}
+                                                        onFocus={handleFocusTask}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </>
+                        ) : (
+                            <div className="text-center py-12 text-gray-400 dark:text-gray-500">
+                                {completedTasks.length > 0 ? <p>All active tasks completed! Great job.</p> : <p>No tasks found. Start by adding one!</p>}
+                            </div>
+                        )}
 
-                            {/* Add Task Inline */}
-                            <div 
+                        {/* Add Task Inline */}
+                        <div 
                             onClick={() => handleManualAdd()}
-                            className="relative flex gap-4 mt-2 group cursor-pointer opacity-60 hover:opacity-100 transition-opacity"
-                            >
+                            className="relative flex gap-4 mt-4 group cursor-pointer opacity-60 hover:opacity-100 transition-opacity"
+                        >
                             <div className="relative z-10 flex-shrink-0 w-6 h-6 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center bg-gray-50 dark:bg-gray-800 group-hover:border-blue-500 transition-colors">
                                 <Plus size={14} className="text-gray-400 group-hover:text-blue-500" />
                             </div>
                             <div className="pt-0.5 text-gray-400 dark:text-gray-500 font-medium group-hover:text-blue-500 transition-colors">
                                 Add task for today
                             </div>
-                            </div>
-                        </div>
                         </div>
 
-                        {/* Previous/Future Days */}
-                        {(Object.entries(groupedTasks) as [string, Task[]][]).map(([key, groupTasks]) => {
-                        if (key === 'Today') return null;
-                        return (
-                            <div key={key} className="mb-8 pt-8 border-t border-gray-50 dark:border-gray-800">
-                            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-6">{key}</h2>
-                            <div>
-                                {groupTasks.map((task, idx, arr) => (
-                                <TimelineItem 
-                                    key={task.id} 
-                                    task={task} 
-                                    isLast={idx === arr.length - 1} 
-                                    onToggle={handleToggleTask}
-                                    onEdit={handleEditTask}
-                                    onSubtaskToggle={handleSubtaskToggle}
-                                    onStatusChange={handleStatusChange}
-                                    onFocus={handleFocusTask}
-                                />
-                                ))}
+                        {/* Completed Tasks Section */}
+                        {completedTasks.length > 0 && (
+                            <div className="mt-12 pt-8 border-t border-gray-100 dark:border-gray-800">
+                                <button 
+                                    onClick={() => setShowCompleted(!showCompleted)}
+                                    className="flex items-center gap-2 text-gray-500 dark:text-gray-400 font-semibold text-sm mb-6 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                                >
+                                    {showCompleted ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                    Completed ({completedTasks.length})
+                                </button>
+                                
+                                {showCompleted && (
+                                    <div className="animate-fade-in">
+                                        {completedTasks.map((task, idx, arr) => (
+                                            <TimelineItem 
+                                                key={task.id} 
+                                                task={task} 
+                                                isLast={idx === arr.length - 1} 
+                                                onToggle={handleToggleTask}
+                                                onEdit={handleEditTask}
+                                                onSubtaskToggle={handleSubtaskToggle}
+                                                onStatusChange={handleStatusChange}
+                                                onFocus={handleFocusTask}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                            </div>
-                        );
-                        })}
-                        
-                        {Object.keys(groupedTasks).length === 0 && (
-                        <div className="text-center py-12 text-gray-400 dark:text-gray-500">
-                            <p>No tasks found. Start by adding one!</p>
-                        </div>
                         )}
+
                     </div>
                 </>
             )}
